@@ -1,22 +1,19 @@
 from .extensions import db, ma
+from marshmallow import Schema, fields, post_dump
 
 class Students(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(80), nullable=False)
-    birth_date = db.Column(db.Date)
-    gender = db.Column(db.String(10))
-    class_name = db.Column(db.String(80))
 
-    def __init__(self, name, email, birth_date, gender, class_name):
+    def __init__(self, name):
         self.name = name
-        self.email = email
-        self.birth_date = birth_date
-        self.gender = gender
-        self.class_name = class_name
 
-class StudentsSchema(ma.Schema):
+class StudentsSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
-        fields = ('id', 'name', 'birth_date', 'gender', 'class_name')
+        model = Students
+        include_fk = True
+        load_instance = True
+        include_relationships = True
 
 class Authors(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -25,9 +22,12 @@ class Authors(db.Model):
     def __init__(self, name):
         self.name = name
 
-class AuthorsSchema(ma.Schema):
+class AuthorsSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
-        fields = ('id', 'name')
+        model = Authors
+        include_fk = True
+        load_instance = True
+        include_relationships = True
 
 class Categories(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -36,9 +36,12 @@ class Categories(db.Model):
     def __init__(self, name):
         self.name = name
 
-class CategoriesSchema(ma.Schema):
+class CategoriesSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
-        fields = ('id', 'name')
+        model = Categories
+        include_fk = True
+        load_instance = True
+        include_relationships = True
 
 class Books(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -47,15 +50,29 @@ class Books(db.Model):
     author_id = db.Column(db.Integer, db.ForeignKey('authors.id'), nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=False)
 
+    category = db.relationship('Categories', backref='books')
+
     def __init__(self, name, page_count, author_id, category_id):
         self.name = name
         self.page_count = page_count
         self.author_id = author_id
         self.category_id = category_id
 
-class BooksSchema(ma.Schema):
+class BooksSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
-        fields = ('id', 'name', 'page_count', 'author_id', 'category_id')
+        model = Books
+        include_fk = True
+        load_instance = True
+        include_relationships = True
+
+    category = ma.Nested(CategoriesSchema) 
+
+    @post_dump
+    def merge_category(self, data, **kwargs):
+        category_data = data.pop('category', {})
+        for key, value in category_data.items():
+            data[f'category_{key}'] = value
+        return data
 
 class Borrowing(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -64,12 +81,13 @@ class Borrowing(db.Model):
     borrowing_date = db.Column(db.Date)
     returning_date = db.Column(db.Date)
 
-    def __init__(self, student_id, book_id, borrowing_date, returning_date):
+    def __init__(self, student_id, book_id):
         self.student_id = student_id
         self.book_id = book_id
-        self.borrowing_date = borrowing_date
-        self.returning_date = returning_date
 
-class BorrowingSchema(ma.Schema):
+class BorrowingSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
-        fields = ('id', 'student_id', 'book_id', 'borrowing_date', 'returning_date')
+        model = Borrowing
+        include_fk = True
+        load_instance = True
+        include_relationships = True
